@@ -28,7 +28,7 @@ jobs:
               - 'docs/api/**'
               - 'openapi.yaml'
               - 'openapi.yml'
-                                    guides:
+            guides:
               - 'docs/guides/**'
             concepts:
               - 'docs/concepts/**'
@@ -130,6 +130,14 @@ This is a **docs-only** pull request (${riskTag}). Our automated checks are runn
               repo: context.repo.repo,
               body
             });
+
+  link-check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Link validation (lychee)
         uses: lycheeverse/lychee-action@v2
