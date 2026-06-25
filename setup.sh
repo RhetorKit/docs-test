@@ -4,7 +4,7 @@
 #
 # PREREQUISITES:
 #   gh auth status  (must show authenticated session with 'repo' scope)
-#   gh --version    (v2.8+ for label import support)
+#   gh --version    (v2.8+)
 #
 # USAGE:
 #   Copy the output files to your target repository, then run:
@@ -12,3 +12,156 @@
 #
 # Review each section before running. Commands are grouped and safe to re-run
 # (most gh commands are idempotent or will fail gracefully if already applied).
+
+
+set -euo pipefail
+
+REPO="RhetorKit/docs-test"
+BRANCH="main"
+
+echo "==> Configuring RhetorKit/docs-test ..."
+echo ""
+
+# ── Repository Settings ───────────────────────────────────────────────────────
+
+echo "==> Applying repository-level settings ..."
+
+gh repo edit "$REPO" \
+  --enable-squash-merge \
+  --enable-merge-commit=false \
+  --enable-rebase-merge=false \
+  --enable-auto-merge \
+  --delete-branch-on-merge
+
+echo "  Merge strategy: squash_only"
+echo "  Auto-delete head branches: enabled"
+echo "  Auto-merge: enabled at repo level"
+
+# ── Labels ────────────────────────────────────────────────────────────────────
+# Uses `gh label create --force` (available in all gh versions) rather than
+# `gh label import` (added in v2.22.0). --force updates a label if it exists.
+
+echo ""
+echo "==> Creating labels ..."
+
+lbl() { gh label create "$1" --color "$2" --description "$3" --repo "$REPO" --force; }
+
+lbl "docs-only"           "0075ca" "PR contains only documentation changes."
+lbl "api-change"          "e4e669" "PR modifies public API documentation or OpenAPI specs."
+lbl "internal-sme"        "cfd3d7" "Contributed by a subject matter expert."
+lbl "high-risk"           "d93f0b" "High-risk content area. 4h reviewer SLA enforced."
+lbl "standard"            "0e8a16" "Standard content area. 24h reviewer SLA enforced."
+lbl "needs-review"        "7c3aed" "PR is awaiting reviewer attention. Reviewer SLA clock is running."
+lbl "needs-author-action" "e11d48" "Reviewer requested changes. Author has 48h (standard) or 24h (high-risk) to respond."
+lbl "ready-to-merge"      "16a34a" "All checks pass and approvals received."
+lbl "stale"               "6b7280" "No activity past SLA window."
+lbl "blocked"             "b91c1c" "Blocked on external dependency. Requires manual resolution."
+lbl "on-hold"             "92400e" "Docs lead has placed this PR on hold."
+lbl "docs/guides"  "bfdbfe" "Affects docs/guides/ — how-to content, tutorials."
+lbl "docs/concepts" "bbf7d0" "Affects docs/concepts/ — conceptual docs, architecture."
+
+echo "  Labels created/updated."
+
+# ── Branch Protection ─────────────────────────────────────────────────────────
+
+echo ""
+echo "==> Applying branch protection rules to $BRANCH ..."
+
+gh api \
+  --method PUT \
+  "/repos/$REPO/branches/$BRANCH/protection" \
+  --input - <<'PROTECTION_EOF'
+{
+  "required_status_checks": {
+    "strict": false,
+    "contexts": ["link-check"]
+  },
+  "enforce_admins": false,
+  "required_pull_request_reviews": {
+    "dismiss_stale_reviews": true,
+    "require_code_owner_reviews": true,
+    "required_approving_review_count": 1,
+    "require_last_push_approval": false
+  },
+  "restrictions": null,
+  "required_conversation_resolution": true,
+  "allow_force_pushes": false,
+  "allow_deletions": false
+}
+PROTECTION_EOF
+
+echo "  Branch protection applied:"
+echo "    Review gate: strict_gate"
+echo "    Conversation resolution required: true"
+echo "    Branches up to date required: false"
+echo "    Force pushes: disabled"
+echo "    Deletions: disabled"
+
+# High-risk paths use Repository Rulesets (path-aware, requires 2 approvals)
+echo ""
+echo "==> Creating high-risk docs ruleset ..."
+
+gh api \
+  --method POST \
+  "/repos/$REPO/rulesets" \
+  --input - <<'RULESET_EOF'
+{
+  "name": "high-risk-docs-protection",
+  "target": "branch",
+  "enforcement": "active",
+  "conditions": {
+    "ref_name": {
+      "include": ["refs/heads/main"],
+      "exclude": []
+    }
+  },
+  "rules": [
+    {
+      "type": "pull_request",
+      "parameters": {
+        "required_approving_review_count": 2,
+        "dismiss_stale_reviews_on_push": true,
+        "require_code_owner_review": true,
+        "require_last_push_approval": false,
+        "required_review_thread_resolution": true
+      }
+    },
+    { "type": "deletion" },
+    { "type": "non_fast_forward" }
+  ]
+}
+RULESET_EOF
+
+echo "  High-risk ruleset created (2 approvals + CODEOWNER required)."
+
+# ── Workflows ─────────────────────────────────────────────────────────────────
+
+echo ""
+echo "==> Enabling workflows ..."
+gh workflow enable docs_triage.yml --repo "$REPO" 2>/dev/null || echo "  (docs_triage.yml not yet pushed — enable after first commit)"
+gh workflow enable docs_stale_pr.yml --repo "$REPO" 2>/dev/null || echo "  (docs_stale_pr.yml not yet pushed — enable after first commit)"
+
+# ── Verification ──────────────────────────────────────────────────────────────
+
+echo ""
+echo "==> Verifying configuration ..."
+
+gh api "repos/$REPO" \
+  --jq '{squash: .allow_squash_merge, merge: .allow_merge_commit, rebase: .allow_rebase_merge, auto_merge: .allow_auto_merge, delete_branch: .delete_branch_on_merge}'
+
+gh api "/repos/$REPO/branches/$BRANCH/protection" \
+  --jq '{required_approvals: .required_pull_request_reviews.required_approving_review_count, dismiss_stale: .required_pull_request_reviews.dismiss_stale_reviews, codeowner_required: .required_pull_request_reviews.require_code_owner_reviews, conversation_resolution: .required_conversation_resolution.enabled, force_push: .allow_force_pushes.enabled}'
+
+echo ""
+echo "==> Labels present:"
+gh label list --repo "$REPO" --json name --jq '.[].name' | sort
+
+echo ""
+echo "==> Setup complete for $REPO"
+echo ""
+echo "NEXT STEPS:"
+echo "  1. Copy all output files to your target repository"
+echo "  2. Replace any remaining [PLACEHOLDER] tokens"
+echo "  3. Push to $BRANCH and verify workflows trigger on a test PR"
+echo "  4. Enable auto-merge on individual PRs: gh pr merge PR_NUMBER --squash --auto --repo $REPO"
+echo "  5. Review SETUP_SUMMARY.md with your team before announcing the governance framework"

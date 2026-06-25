@@ -5,7 +5,7 @@ Thank you for contributing to docs-test. Please read this guide before opening a
 ## Prerequisites
 
 - Git version 2.30+
-- Access to docs-test on GitHub (request via #rhetorkit)
+- Access to docs-test on GitHub (request via #docs)
 
 ## Five-Minute Quick Start: Edit a File via GitHub Web
 
@@ -44,14 +44,7 @@ docs: update OAuth 2.0 flow diagram for clarity
 
 ## Local Development & Preview
 
-```bash
-# Replace with your actual preview command
-make preview-docs
-# or: docker run --rm -p 8000:8000 -v $(pwd):/docs your-docs-image
-# or: npm run dev
-```
-
-Rendered docs are available at `http://localhost:8000`. Fix any rendering issues before opening your PR.
+This repository uses plain Markdown files — no local build step is required. Preview your changes in GitHub's web editor or a local Markdown viewer.
 
 ## How to Submit a Pull Request
 
@@ -70,7 +63,7 @@ Your PR is automatically labeled and routed by our triage workflow. You will see
 Your PR is automatically classified on open:
 
 - **Standard content** (how-tos, concepts, guides): **24-hour** initial review window
-- **High-risk content** (security, compliance, public APIs): **4-hour** initial review window
+- **High-risk content** (public APIs): **4-hour** initial review window
 
 After your initial review, keep an eye for "Request Changes" feedback. The reviewer SLA clock restarts once you re-request review (see next section).
 
@@ -112,7 +105,7 @@ Please see .
 
 | Problem | Contact |
 | --- | --- |
-| Git workflow or branch conflicts | Post a comment in the PR or message #rhetorkit |
-| Style, tone, or content questions | Post a comment in the PR or ping @ghoulmann |
-| Permissions or account issues | Email test@example.com |
+| Git workflow or branch conflicts | Post a comment in the PR or message #docs |
+| Style, tone, or content questions | Post a comment in the PR |
+| Permissions or account issues | Email  |
 | High-risk content urgency | Tag @ghoulmann directly in the PR |

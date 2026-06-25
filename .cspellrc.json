@@ -1,0 +1,16 @@
+{
+  "$schema": "https://raw.githubusercontent.com/streetsidesoftware/cspell/main/cspell.schema.json",
+  "version": "0.2",
+  "language": "en-US",
+  "words": [],
+  "files": ["**/*.md"],
+  "ignorePaths": [
+    "node_modules",
+    ".github/styles",
+    "*.lock",
+    "package-lock.json",
+    "yarn.lock"
+  ],
+  "dictionaries": ["en-US"],
+  "flagWords": []
+}
