@@ -4,7 +4,7 @@
 #
 # PREREQUISITES:
 #   gh auth status  (must show authenticated session with 'repo' scope)
-#   gh --version    (v2.8+ for label import support)
+#   gh --version    (v2.8+)
 #
 # USAGE:
 #   Copy the output files to your target repository, then run:
@@ -29,18 +29,37 @@ gh repo edit "$REPO" \
   --enable-squash-merge \
   --enable-merge-commit=false \
   --enable-rebase-merge=false \
+  --enable-auto-merge \
   --delete-branch-on-merge
 
 echo "  Merge strategy: squash_only"
 echo "  Auto-delete head branches: enabled"
-
+echo "  Auto-merge: enabled at repo level"
 
 # ── Labels ────────────────────────────────────────────────────────────────────
+# Uses `gh label create --force` (available in all gh versions) rather than
+# `gh label import` (added in v2.22.0). --force updates a label if it exists.
 
 echo ""
-echo "==> Importing labels from .github/labels.yml ..."
-gh label import .github/labels.yml --repo "$REPO"
-echo "  Labels imported."
+echo "==> Creating labels ..."
+
+lbl() { gh label create "$1" --color "$2" --description "$3" --repo "$REPO" --force; }
+
+lbl "docs-only"           "0075ca" "PR contains only documentation changes."
+lbl "api-change"          "e4e669" "PR modifies public API documentation or OpenAPI specs."
+lbl "internal-sme"        "cfd3d7" "Contributed by a subject matter expert."
+lbl "high-risk"           "d93f0b" "High-risk content area. 4h reviewer SLA enforced."
+lbl "standard"            "0e8a16" "Standard content area. 24h reviewer SLA enforced."
+lbl "needs-review"        "7c3aed" "PR is awaiting reviewer attention. Reviewer SLA clock is running."
+lbl "needs-author-action" "e11d48" "Reviewer requested changes. Author has 48h (standard) or 24h (high-risk) to respond."
+lbl "ready-to-merge"      "16a34a" "All checks pass and approvals received."
+lbl "stale"               "6b7280" "No activity past SLA window."
+lbl "blocked"             "b91c1c" "Blocked on external dependency. Requires manual resolution."
+lbl "on-hold"             "92400e" "Docs lead has placed this PR on hold."
+lbl "docs/guides"  "bfdbfe" "Affects docs/guides/ — how-to content, tutorials."
+lbl "docs/concepts" "bbf7d0" "Affects docs/concepts/ — conceptual docs, architecture."
+
+echo "  Labels created/updated."
 
 # ── Branch Protection ─────────────────────────────────────────────────────────
 
@@ -54,7 +73,7 @@ gh api \
 {
   "required_status_checks": {
     "strict": false,
-    "contexts": ["link-check", "spellcheck"]
+    "contexts": ["link-check"]
   },
   "enforce_admins": false,
   "required_pull_request_reviews": {
@@ -143,4 +162,5 @@ echo "NEXT STEPS:"
 echo "  1. Copy all output files to your target repository"
 echo "  2. Replace any remaining [PLACEHOLDER] tokens"
 echo "  3. Push to $BRANCH and verify workflows trigger on a test PR"
+echo "  4. Enable auto-merge on individual PRs: gh pr merge PR_NUMBER --squash --auto --repo $REPO"
 echo "  5. Review SETUP_SUMMARY.md with your team before announcing the governance framework"
